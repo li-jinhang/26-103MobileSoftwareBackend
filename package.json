@@ -9,6 +9,8 @@
     "start:dev": "ts-node-dev --respawn --transpile-only src/main.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/main.js",
+    "backend:up": "powershell -ExecutionPolicy Bypass -File ./scripts/start-backend.ps1",
+    "backend:up:reset": "powershell -ExecutionPolicy Bypass -File ./scripts/start-backend.ps1 -Reseed",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev --name init",
     "prisma:seed": "ts-node prisma/seed.ts"

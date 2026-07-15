@@ -5,11 +5,27 @@
 ## 启动
 
 ```bash
-npm install
-npx prisma generate
-npx prisma migrate dev --name init
-npm run prisma:seed
-npm run start:dev
+.\start-backend.cmd
+```
+
+或在终端中执行：
+
+```bash
+npm run backend:up
+```
+
+脚本会自动完成以下操作：
+
+- 首次运行时自动安装依赖
+- 自动停止当前项目里已运行的后端开发进程，避免 Prisma 引擎文件被占用
+- 自动执行 `prisma generate` 与 `prisma migrate deploy`
+- 首次创建数据库时自动写入初始示例数据
+- 最后启动 `npm run start:dev`
+
+如果需要重置并重新写入示例数据，可执行：
+
+```bash
+npm run backend:up:reset
 ```
 
 服务默认地址：
@@ -56,4 +72,4 @@ npm run start:dev
 ## Prisma 常见问题
 
 - 在 Windows 下执行 `npx prisma generate` 或 `npx prisma migrate dev` 时，如果出现 `EPERM: operation not permitted, rename ... query_engine-windows.dll.node`，通常是因为正在运行的 `npm run start:dev`、`ts-node-dev` 或其他 Node 进程占用了 Prisma 引擎文件。
-- 处理方式：先停止当前项目的开发服务，再删除 `node_modules/.prisma/client` 下残留的 `query_engine-windows.dll.node.tmp*` 文件，然后重新执行 `npx prisma generate`。
+- 现在可以直接使用 `.\start-backend.cmd` 或 `npm run backend:up`，脚本会自动停止当前项目相关进程并清理残留的临时引擎文件。
