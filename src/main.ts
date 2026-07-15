@@ -5,6 +5,7 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { AppException } from './common/app-exception';
 import { HttpExceptionFilter } from './common/http-exception.filter';
+import { json } from 'express';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -19,6 +20,7 @@ async function bootstrap() {
     })
   );
   app.enableCors();
+  app.use(json({ limit: '10mb' }));
 
   const swaggerConfig = new DocumentBuilder()
     .setTitle('智协库后端接口')

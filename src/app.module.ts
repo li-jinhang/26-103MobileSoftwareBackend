@@ -6,6 +6,7 @@ import { KnowledgeModule } from './modules/knowledge.module';
 import { WorkflowModule } from './modules/workflow.module';
 import { NotificationsModule } from './modules/notifications.module';
 import { AssistantModule } from './modules/assistant.module';
+import { OcrModule } from './modules/ocr.module';
 
 @Module({
   imports: [
@@ -16,7 +17,8 @@ import { AssistantModule } from './modules/assistant.module';
     KnowledgeModule,
     WorkflowModule,
     NotificationsModule,
-    AssistantModule
+    AssistantModule,
+    OcrModule
   ],
   providers: [PrismaService]
 })
