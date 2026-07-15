@@ -12,6 +12,9 @@ async function main() {
   await prisma.approvalRecord.deleteMany();
   await prisma.workflowInstance.deleteMany();
   await prisma.notification.deleteMany();
+  await prisma.mailRecipient.deleteMany();
+  await prisma.internalMail.deleteMany();
+  await prisma.attendanceRecord.deleteMany();
   await prisma.knowledgeCorrection.deleteMany();
   await prisma.assistantHistory.deleteMany();
   await prisma.auditLog.deleteMany();
@@ -333,6 +336,45 @@ async function main() {
             time: '2026-07-10 11:00'
           }
         ]
+      }
+    }
+  });
+
+  await prisma.attendanceRecord.createMany({
+    data: [
+      {
+        id: 'at1',
+        userId: 'u1',
+        userName: '张晓宁',
+        type: 'checkIn',
+        time: '2026-07-15 08:56',
+        location: '深圳南山办公区',
+        note: '正常到岗',
+        status: 'normal'
+      }
+    ]
+  });
+
+  await prisma.internalMail.create({
+    data: {
+      id: 'mail2',
+      subject: '报销材料已补充，请查收',
+      summary: '已补齐发票和行程截图，可直接进入审批。',
+      content: '你的差旅报销材料已补充完整，包括电子发票、行程截图和事由说明。',
+      senderId: 'u2',
+      senderName: '李清越',
+      importance: 'normal',
+      createTime: '2026-07-15 10:12',
+      relatedWorkflowId: 'i1',
+      relatedKnowledgeId: 'k2',
+      recipients: {
+        create: {
+          id: 'mail-recipient-1',
+          userId: 'u1',
+          userName: '张晓宁',
+          read: false,
+          readTime: ''
+        }
       }
     }
   });

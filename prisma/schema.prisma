@@ -8,9 +8,9 @@ datasource db {
 }
 
 model User {
-  id                       String               @id
+  id                       String                @id
   name                     String
-  account                  String               @unique
+  account                  String                @unique
   passwordHash             String
   department               String
   role                     String
@@ -18,23 +18,26 @@ model User {
   permissionsJson          String
   favoriteKnowledgeIdsJson String
   recentKnowledgeIdsJson   String
-  todoCount                Int                  @default(0)
-  createdAt                DateTime             @default(now())
-  updatedAt                DateTime             @updatedAt
+  todoCount                Int                   @default(0)
+  createdAt                DateTime              @default(now())
+  updatedAt                DateTime              @updatedAt
   sessions                 Session[]
   workflowInstances        WorkflowInstance[]
   knowledgeCorrections     KnowledgeCorrection[]
   assistantHistories       AssistantHistory[]
+  attendanceRecords        AttendanceRecord[]
+  sentMails                InternalMail[]        @relation("MailSender")
+  mailRecipients           MailRecipient[]
 }
 
 model Session {
-  id        String   @id @default(cuid())
-  token     String   @unique
+  id        String    @id @default(cuid())
+  token     String    @unique
   userId    String
   expiresAt DateTime
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
   revokedAt DateTime?
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model KnowledgeCategory {
@@ -74,26 +77,26 @@ model WorkflowTemplate {
 }
 
 model WorkflowInstance {
-  id                     String           @id
-  templateId             String
-  title                  String
-  applicantId            String
-  applicantName          String
-  status                 String
-  currentNode            String
-  currentApproverRole    String
-  createTime             String
-  latestComment          String
+  id                      String           @id
+  templateId              String
+  title                   String
+  applicantId             String
+  applicantName           String
+  status                  String
+  currentNode             String
+  currentApproverRole     String
+  createTime              String
+  latestComment           String
   relatedKnowledgeIdsJson String
-  amount                 Float
-  formSummary            String
-  formDetailJson         String
-  riskLevel              String
-  riskReason             String
+  amount                  Float
+  formSummary             String
+  formDetailJson          String
+  riskLevel               String
+  riskReason              String
   requiresSecurityConfirm Boolean
-  securityConfirmed      Boolean          @default(false)
-  applicant              User             @relation(fields: [applicantId], references: [id], onDelete: Restrict)
-  approvalRecords        ApprovalRecord[]
+  securityConfirmed       Boolean          @default(false)
+  applicant               User             @relation(fields: [applicantId], references: [id], onDelete: Restrict)
+  approvalRecords         ApprovalRecord[]
 
   @@index([applicantId])
   @@index([currentApproverRole])
@@ -114,7 +117,7 @@ model ApprovalRecord {
 }
 
 model Notification {
-  id              String @id
+  id              String  @id
   title           String
   content         String
   time            String
@@ -122,6 +125,54 @@ model Notification {
   targetRolesJson String
   targetType      String
   targetId        String
+  recipientUserId String?
+
+  @@index([recipientUserId])
+}
+
+model AttendanceRecord {
+  id       String @id
+  userId   String
+  userName String
+  type     String
+  time     String
+  location String
+  note     String
+  status   String
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, time])
+}
+
+model InternalMail {
+  id                 String          @id
+  subject            String
+  summary            String
+  content            String
+  senderId           String
+  senderName         String
+  importance         String          @default("normal")
+  createTime         String
+  relatedWorkflowId  String
+  relatedKnowledgeId String
+  sender             User            @relation("MailSender", fields: [senderId], references: [id], onDelete: Restrict)
+  recipients         MailRecipient[]
+
+  @@index([senderId, createTime])
+}
+
+model MailRecipient {
+  id       String       @id
+  mailId   String
+  userId   String
+  userName String
+  read     Boolean      @default(false)
+  readTime String
+  mail     InternalMail @relation(fields: [mailId], references: [id], onDelete: Cascade)
+  user     User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([mailId, userId])
+  @@index([userId])
 }
 
 model KnowledgeCorrection {
@@ -135,14 +186,14 @@ model KnowledgeCorrection {
 }
 
 model AssistantHistory {
-  id                   String @id
-  userId               String
-  question             String
-  answer               String
+  id                      String @id
+  userId                  String
+  question                String
+  answer                  String
   relatedKnowledgeIdsJson String
-  recommendedWorkflowId String
-  time                 String
-  user                 User   @relation(fields: [userId], references: [id], onDelete: Restrict)
+  recommendedWorkflowId   String
+  time                    String
+  user                    User   @relation(fields: [userId], references: [id], onDelete: Restrict)
 }
 
 model AuditLog {

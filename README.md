@@ -194,6 +194,16 @@ dist/src/main.js
 - `POST /api/workflow/instances/:id/security-confirm`
 - `GET /api/notifications`
 - `POST /api/notifications/:id/read`
+- `GET /api/attendance/today`
+- `GET /api/attendance/records/my`
+- `POST /api/attendance/check-in`
+- `POST /api/attendance/check-out`
+- `GET /api/mail/inbox`
+- `GET /api/mail/sent`
+- `GET /api/mail/:id`
+- `POST /api/mail/send`
+- `POST /api/mail/:id/read`
+- `DELETE /api/mail/:id`
 - `POST /api/assistant/ask`
 
 ## 默认测试账号

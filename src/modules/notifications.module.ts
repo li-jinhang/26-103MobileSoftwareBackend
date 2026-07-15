@@ -28,6 +28,7 @@ class NotificationQueryDto {
 
 type AuthenticatedRequest = Request & {
   user?: {
+    id: string;
     role: string;
   };
 };
@@ -36,7 +37,7 @@ type AuthenticatedRequest = Request & {
 class NotificationsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async list(role: string, unreadOnly?: boolean) {
+  async list(userId: string, role: string, unreadOnly?: boolean) {
     const notifications = await this.prisma.notification.findMany({
       where: unreadOnly
         ? {
@@ -47,7 +48,9 @@ class NotificationsService {
 
     return ok(
       notifications
-        .filter((item: { targetRolesJson: string }) => parseJsonArray<string>(item.targetRolesJson).includes(role))
+        .filter((item: { targetRolesJson: string; recipientUserId: string | null }) =>
+          item.recipientUserId ? item.recipientUserId === userId : parseJsonArray<string>(item.targetRolesJson).includes(role)
+        )
         .map((item: {
           id: string;
           title: string;
@@ -57,6 +60,7 @@ class NotificationsService {
           targetRolesJson: string;
           targetType: string;
           targetId: string;
+          recipientUserId: string | null;
         }) => ({
           id: item.id,
           title: item.title,
@@ -70,7 +74,7 @@ class NotificationsService {
     );
   }
 
-  async read(role: string, id: string) {
+  async read(userId: string, role: string, id: string) {
     const notification = await this.prisma.notification.findUnique({
       where: {
         id
@@ -81,7 +85,10 @@ class NotificationsService {
       throw new AppException(1004, '消息不存在', HttpStatus.NOT_FOUND);
     }
 
-    if (!parseJsonArray<string>(notification.targetRolesJson).includes(role)) {
+    const permitted = notification.recipientUserId
+      ? notification.recipientUserId === userId
+      : parseJsonArray<string>(notification.targetRolesJson).includes(role);
+    if (!permitted) {
       throw new AppException(1003, '无权限访问', HttpStatus.FORBIDDEN);
     }
 
@@ -111,12 +118,12 @@ class NotificationsController {
 
   @Get()
   async list(@Req() request: AuthenticatedRequest, @Query() query: NotificationQueryDto) {
-    return this.notificationsService.list(request.user!.role, query.unreadOnly);
+    return this.notificationsService.list(request.user!.id, request.user!.role, query.unreadOnly);
   }
 
   @Post(':id/read')
   async read(@Req() request: AuthenticatedRequest, @Param('id') id: string) {
-    return this.notificationsService.read(request.user!.role, id);
+    return this.notificationsService.read(request.user!.id, request.user!.role, id);
   }
 }
 
