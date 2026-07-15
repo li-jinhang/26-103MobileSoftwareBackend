@@ -33,6 +33,146 @@ npm run backend:up:reset
 - API: `http://localhost:26102/api`
 - Swagger: `http://localhost:26102/docs`
 
+## 服务器部署
+
+下面的步骤适用于将当前后端项目通过 `git` 部署到 Linux 服务器。
+
+### 1. 服务器准备
+
+先在服务器安装以下环境：
+
+- `git`
+- `Node.js 20 LTS`
+- `npm`
+- `pm2`
+
+可参考以下命令：
+
+```bash
+sudo apt update
+sudo apt install -y git curl
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt install -y nodejs
+sudo npm install -g pm2
+```
+
+### 2. 拉取项目代码
+
+```bash
+git clone <你的仓库地址>
+cd MobileSoftwareBackend
+```
+
+### 3. 配置环境变量
+
+在项目根目录创建 `.env`：
+
+```env
+DATABASE_URL="file:./dev.db"
+PORT=26102
+```
+
+说明：
+
+- 当前项目使用 `SQLite`，数据库文件会按 `DATABASE_URL` 指向的位置创建
+- 不要把本地开发机的 `.env` 直接提交到仓库
+
+### 4. 安装依赖并初始化数据库
+
+```bash
+npm ci
+npx prisma generate
+npx prisma migrate deploy
+npm run prisma:seed
+```
+
+说明：
+
+- `prisma migrate deploy` 用于在服务器上应用已提交的迁移
+- `npm run prisma:seed` 用于首次写入示例数据；如果你已经有正式数据，不要重复执行
+
+### 5. 构建并启动服务
+
+```bash
+npm run build
+pm2 start dist/src/main.js --name mobile-backend
+pm2 save
+```
+
+说明：
+
+- 当前项目编译后的服务入口文件为 `dist/src/main.js`
+- 因此在服务器上不要直接写成 `node dist/main.js`
+
+查看运行状态与日志：
+
+```bash
+pm2 status
+pm2 logs mobile-backend
+```
+
+重启服务：
+
+```bash
+pm2 restart mobile-backend
+```
+
+### 6. 宝塔面板更简单的部署方式
+
+如果你使用的是宝塔面板，通常可以不用手动写完整的 `pm2` 命令，直接使用宝塔的 `Node 项目` 或 `PM2 管理器`。
+
+推荐方式：
+
+1. 在宝塔中安装 `Node.js 20`
+2. 将仓库拉到服务器目录
+3. 在项目目录先执行一次初始化：
+
+```bash
+npm ci
+npx prisma generate
+npx prisma migrate deploy
+npm run prisma:seed
+npm run build
+```
+
+然后在宝塔中按下面方式配置：
+
+- 项目目录：当前仓库目录
+- Node 版本：`20`
+- 启动命令：`node dist/src/main.js`
+- 端口：`26102`
+- 环境变量：
+  - `DATABASE_URL=file:./dev.db`
+  - `PORT=26102`
+
+如果你用的是宝塔 `PM2 管理器`，启动文件同样填写：
+
+```bash
+dist/src/main.js
+```
+
+解释器选择 `node` 即可。
+
+额外说明：
+
+- `npm run backend:up` 和 `.\start-backend.cmd` 主要用于本地 Windows 开发环境，不适合直接在宝塔 Linux 环境中使用
+- 如果需要通过域名访问，建议在宝塔网站里配置反向代理到 `127.0.0.1:26102`
+
+### 7. 验证部署结果
+
+浏览器访问：
+
+- `http://<服务器IP>:26102/api`
+- `http://<服务器IP>:26102/docs`
+
+如果服务器启用了防火墙或安全组，还需要放行 `26102` 端口。
+
+### 8. 注意事项
+
+- `npm run backend:up` 和 `.\start-backend.cmd` 主要用于本地 Windows 开发环境，不适合直接在 Linux 服务器使用
+- 当前项目使用 `SQLite`，适合课程作业、演示或轻量部署；如果后续需要多人并发和长期运行，建议再迁移到 `MySQL` 或 `PostgreSQL`
+- 建议定期备份服务器上的 SQLite 数据库文件
+
 ## 已实现模块
 
 - `POST /api/auth/login`
