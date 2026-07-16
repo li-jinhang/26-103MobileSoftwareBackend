@@ -1,17 +1,26 @@
 import {
   Body,
   Controller,
+  HttpStatus,
   Injectable,
   Module,
   Post,
   Req,
   UseGuards
 } from '@nestjs/common';
-import { IsNotEmpty, IsString } from 'class-validator';
+import { IsIn, IsNotEmpty, IsOptional, IsString } from 'class-validator';
 import { Request } from 'express';
+import { AppException } from '../common/app-exception';
 import { ok } from '../common/app-response';
+import {
+  AssistantAnalysisResult,
+  AssistantFormDraft,
+  AssistantIntent,
+  parseAssistantModelContent
+} from '../common/assistant-result';
 import { AuthGuard } from '../common/auth.guard';
-import { formatDateTime, toJson } from '../common/helpers';
+import { formatDateTime, parseJsonArray, toJson } from '../common/helpers';
+import { LlmMessage, requestLlmJson } from '../common/llm-client';
 import { PrismaService } from '../prisma/prisma.service';
 
 class AskDto {
@@ -20,69 +29,158 @@ class AskDto {
   question!: string;
 }
 
+class AnalyzeAssistantDto {
+  @IsOptional()
+  @IsString()
+  text = '';
+
+  @IsOptional()
+  @IsString()
+  imageBase64 = '';
+
+  @IsOptional()
+  @IsIn(['', 'image/jpeg', 'image/png'])
+  imageMimeType = '';
+}
+
 type AuthenticatedRequest = Request & {
-  user?: {
-    id: string;
-  };
+  user?: { id: string };
 };
+
+interface KnowledgeContext {
+  id: string;
+  title: string;
+  summary: string;
+  content: string;
+  categoryName: string;
+  tags: string[];
+  relatedWorkflowIds: string[];
+}
+
+interface WorkflowContext {
+  id: string;
+  name: string;
+  description: string;
+  riskLevel: string;
+  riskHint: string;
+}
+
+const INTENT_WORKFLOW: Record<AssistantIntent, string> = {
+  knowledge_query: '',
+  leave: 'wf1',
+  reimbursement: 'wf2',
+  purchase: 'wf3',
+  permission: 'wf4',
+  unknown: ''
+};
+
+function clearWorkflow(result: AssistantAnalysisResult): void {
+  const emptyDraft: AssistantFormDraft = {
+    title: '', extra: '', date: '', amount: '', reason: '', attachment: ''
+  };
+  result.recommendedWorkflowId = '';
+  result.formDraft = emptyDraft;
+  result.missingFields = [];
+}
 
 @Injectable()
 class AssistantService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async ask(userId: string, question: string) {
-    const keyword = question.trim();
-    let reply: {
-      answer: string;
-      relatedKnowledgeIds: string[];
-      recommendedWorkflowId: string;
-    };
-
-    if (keyword.includes('报销') || keyword.includes('打车') || keyword.includes('发票')) {
-      reply = {
-        answer: '根据《差旅报销制度》，报销需上传发票、行程截图和事由说明。你可以直接发起“报销申请”。',
-        relatedKnowledgeIds: ['k2'],
-        recommendedWorkflowId: 'wf2'
-      };
-    } else if (keyword.includes('请假') || keyword.includes('病假') || keyword.includes('年假')) {
-      reply = {
-        answer: '请假前建议先查看《请假制度说明》，确认请假类型和材料要求，然后发起“请假申请”。',
-        relatedKnowledgeIds: ['k1'],
-        recommendedWorkflowId: 'wf1'
-      };
-    } else if (keyword.includes('权限') || keyword.includes('账号') || keyword.includes('系统')) {
-      reply = {
-        answer: '系统权限开通需要说明业务场景、系统名称和期限范围，建议先阅读《系统权限申请规范》并发起“权限申请”。',
-        relatedKnowledgeIds: ['k4'],
-        recommendedWorkflowId: 'wf4'
-      };
-    } else if (keyword.includes('采购') || keyword.includes('预算') || keyword.includes('合同')) {
-      reply = {
-        answer: '采购流程需补充用途、预算和期望到货时间，可参考《采购申请规范》后发起“采购申请”。',
-        relatedKnowledgeIds: ['k3'],
-        recommendedWorkflowId: 'wf3'
-      };
-    } else {
-      reply = {
-        answer: '我已经为你检索到相关知识入口。当前基础版本采用关键词匹配，后续可以接入更完整的智能问答能力。',
-        relatedKnowledgeIds: ['k1', 'k2'],
-        recommendedWorkflowId: 'wf1'
-      };
+  async analyze(userId: string, input: AnalyzeAssistantDto) {
+    const text = input.text.trim();
+    const imageBase64 = input.imageBase64.trim();
+    const imageMimeType = input.imageMimeType.trim();
+    if (text.length === 0 && imageBase64.length === 0) {
+      throw new AppException(1001, '请输入问题或选择图片', HttpStatus.BAD_REQUEST);
+    }
+    if (imageBase64.length > 8_000_000) {
+      throw new AppException(1001, '图片过大，请选择较小的图片', HttpStatus.PAYLOAD_TOO_LARGE);
+    }
+    if (imageBase64.length > 0 && !['image/jpeg', 'image/png'].includes(imageMimeType)) {
+      throw new AppException(1001, '图片格式仅支持 JPEG 或 PNG', HttpStatus.BAD_REQUEST);
     }
 
+    const [articles, templates] = await Promise.all([
+      this.prisma.knowledgeArticle.findMany({
+        where: { status: 'published' },
+        orderBy: { updateTime: 'desc' }
+      }),
+      this.prisma.workflowTemplate.findMany({ orderBy: { id: 'asc' } })
+    ]);
+    const knowledgeContext: KnowledgeContext[] = articles.map((article) => ({
+      id: article.id,
+      title: article.title,
+      summary: article.summary,
+      content: article.content,
+      categoryName: article.categoryName,
+      tags: parseJsonArray(article.tagsJson),
+      relatedWorkflowIds: parseJsonArray(article.relatedWorkflowIdsJson)
+    }));
+    const workflowContext: WorkflowContext[] = templates.map((template) => ({
+      id: template.id,
+      name: template.name,
+      description: template.description,
+      riskLevel: template.riskLevel,
+      riskHint: template.riskHint
+    }));
+    const systemPrompt = [
+      '你是公司内部智能知识助手，同时具备图片理解能力。',
+      '只能依据提供的知识和流程上下文回答，不得编造制度、知识ID或流程ID。',
+      '只返回合法JSON，禁止Markdown和额外文字。',
+      '必须返回 answer, recognizedText, intent, relatedKnowledgeIds, recommendedWorkflowId, confidence, formDraft, missingFields。',
+      'intent只能是 knowledge_query, leave, reimbursement, purchase, permission, unknown。',
+      'formDraft必须包含 title, extra, date, amount, reason, attachment 六个字符串字段。',
+      '无法确认的字段使用空字符串并加入missingFields；不要假装已提交任何流程。',
+      `当前时间：${formatDateTime()}，时区：Asia/Shanghai。`,
+      `知识上下文：${JSON.stringify(knowledgeContext)}`,
+      `流程上下文：${JSON.stringify(workflowContext)}`
+    ].join('\n');
+    const userContent: unknown = imageBase64.length > 0
+      ? [
+          {
+            type: 'text',
+            text: text.length > 0 ? text : '读取图片内容，并回答与公司知识或流程相关的问题。'
+          },
+          {
+            type: 'image_url',
+            image_url: { url: `data:${imageMimeType};base64,${imageBase64}` }
+          }
+        ]
+      : text;
+    const messages: LlmMessage[] = [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userContent }
+    ];
+    const modelContent = await requestLlmJson(messages);
+    const result = parseAssistantModelContent(
+      modelContent,
+      new Set(articles.map((article) => article.id)),
+      new Set(templates.map((template) => template.id))
+    );
+    const requiredWorkflow = INTENT_WORKFLOW[result.intent];
+    if (requiredWorkflow.length === 0 || result.recommendedWorkflowId !== requiredWorkflow) {
+      clearWorkflow(result);
+    }
+    if (result.answer.length === 0) {
+      throw new AppException(1007, '大模型未返回可用回答', HttpStatus.BAD_GATEWAY);
+    }
+
+    const question = text.length > 0
+      ? text
+      : `图片查询：${result.recognizedText.slice(0, 120) || '未提取到文字'}`;
     await this.prisma.assistantHistory.create({
       data: {
         id: `ah${Date.now()}`,
         userId,
         question,
-        answer: reply.answer,
-        relatedKnowledgeIdsJson: toJson(reply.relatedKnowledgeIds),
-        recommendedWorkflowId: reply.recommendedWorkflowId,
+        answer: result.answer,
+        relatedKnowledgeIdsJson: toJson(result.relatedKnowledgeIds),
+        recommendedWorkflowId: result.recommendedWorkflowId,
         time: formatDateTime()
       }
     });
-
-    return ok(reply);
+    return ok(result);
   }
 }
 
@@ -91,9 +189,16 @@ class AssistantService {
 class AssistantController {
   constructor(private readonly assistantService: AssistantService) {}
 
+  @Post('analyze')
+  async analyze(@Req() request: AuthenticatedRequest, @Body() body: AnalyzeAssistantDto) {
+    return this.assistantService.analyze(request.user!.id, body);
+  }
+
   @Post('ask')
   async ask(@Req() request: AuthenticatedRequest, @Body() body: AskDto) {
-    return this.assistantService.ask(request.user!.id, body.question);
+    const input = new AnalyzeAssistantDto();
+    input.text = body.question;
+    return this.assistantService.analyze(request.user!.id, input);
   }
 }
 

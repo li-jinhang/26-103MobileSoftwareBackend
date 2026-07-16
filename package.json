@@ -13,7 +13,8 @@
     "backend:up:reset": "powershell -ExecutionPolicy Bypass -File ./scripts/start-backend.ps1 -Reseed",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev --name init",
-    "prisma:seed": "ts-node prisma/seed.ts"
+    "prisma:seed": "ts-node prisma/seed.ts",
+    "test:assistant": "ts-node scripts/assistant-parser-smoke.ts"
   },
   "dependencies": {
     "@nestjs/common": "^11.1.8",

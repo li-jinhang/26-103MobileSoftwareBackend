@@ -1,7 +1,6 @@
 import {
   Body,
   Controller,
-  HttpStatus,
   Injectable,
   Module,
   Post,
@@ -9,8 +8,8 @@ import {
 } from '@nestjs/common';
 import { IsNotEmpty, IsString } from 'class-validator';
 import { ok } from '../common/app-response';
-import { AppException } from '../common/app-exception';
 import { AuthGuard } from '../common/auth.guard';
+import { requestLlmJson } from '../common/llm-client';
 import { PrismaService } from '../prisma/prisma.service';
 
 class OcrRequestDto {
@@ -26,10 +25,6 @@ interface OcrStructuredResult {
   fields: Record<string, string>;
   error: string;
   provider: string;
-}
-
-interface OpenAiResponse {
-  choices?: Array<{ message?: { content?: string | Array<{ text?: string }> } }>;
 }
 
 function parseModelContent(content: string): OcrStructuredResult {
@@ -86,47 +81,19 @@ function parseModelContent(content: string): OcrStructuredResult {
 @Injectable()
 class OcrService {
   async recognize(imageBase64: string) {
-    const baseUrl = (process.env.LLM_BASE_URL ?? '').replace(/\/$/, '');
-    const apiKey = process.env.LLM_API_KEY ?? '';
-    const model = process.env.LLM_MODEL ?? '';
-    if (!baseUrl || !apiKey || !model) {
-      throw new AppException(1007, '视觉大模型服务尚未配置', HttpStatus.SERVICE_UNAVAILABLE);
-    }
-
-    const response = await fetch(`${baseUrl}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`
+    const modelText = await requestLlmJson([
+      {
+        role: 'system',
+        content: '你是图片文字识别服务。只能返回合法 JSON，禁止 Markdown 和解释文字。必须包含 success(boolean)、text(string)、keywords(string数组)、fields(字符串键值对象)、error(string)。识别失败时 success=false，其他内容使用空值，并填写 error。'
       },
-      body: JSON.stringify({
-        model,
-        temperature: 0,
-        response_format: { type: 'json_object' },
-        messages: [
-          {
-            role: 'system',
-            content: '你是图片文字识别服务。只能返回合法 JSON，禁止 Markdown 和解释文字。必须包含 success(boolean)、text(string)、keywords(string数组)、fields(字符串键值对象)、error(string)。识别失败时 success=false，其他内容使用空值，并填写 error。'
-          },
-          {
-            role: 'user',
-            content: [
-              { type: 'text', text: '读取图片中的全部可见文字，并严格按要求返回 JSON。' },
-              { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${imageBase64}` } }
-            ]
-          }
+      {
+        role: 'user',
+        content: [
+          { type: 'text', text: '读取图片中的全部可见文字，并严格按要求返回 JSON。' },
+          { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${imageBase64}` } }
         ]
-      })
-    });
-
-    if (!response.ok) {
-      throw new AppException(1007, `视觉大模型请求失败: HTTP ${response.status}`, HttpStatus.BAD_GATEWAY);
-    }
-    const payload = await response.json() as OpenAiResponse;
-    const content = payload.choices?.[0]?.message?.content;
-    const modelText = typeof content === 'string'
-      ? content
-      : Array.isArray(content) ? content.map((item) => item.text ?? '').join('') : '';
+      }
+    ]);
     return ok(parseModelContent(modelText));
   }
 }
