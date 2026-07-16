@@ -14,7 +14,8 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev --name init",
     "prisma:seed": "ts-node prisma/seed.ts",
-    "test:assistant": "ts-node scripts/assistant-parser-smoke.ts"
+    "test:assistant": "ts-node scripts/assistant-parser-smoke.ts",
+    "test:handoff": "ts-node scripts/interface-handoff-smoke.ts"
   },
   "dependencies": {
     "@nestjs/common": "^11.1.8",

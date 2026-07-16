@@ -1,8 +1,8 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { Request } from 'express';
 import { ok } from '../../common/app-response';
 import { AuthGuard } from '../../common/auth.guard';
-import { CreateDepartmentDto, OrganizationUsersQueryDto, UpdateDepartmentDto, UpdateUserOrganizationDto } from './organization.dto';
+import { CreateDepartmentDto, CreateUserDto, OrganizationUsersQueryDto, UpdateDepartmentDto, UpdateUserOrganizationDto } from './organization.dto';
 import { OrganizationService } from './organization.service';
 
 type AuthenticatedRequest = Request & { user?: { id: string; name: string; role: string } };
@@ -27,6 +27,11 @@ export class OrganizationController {
     return ok(await this.organizationService.searchUsers(request.user!, query));
   }
 
+  @Post('users')
+  async createUser(@Req() request: AuthenticatedRequest, @Body() body: CreateUserDto) {
+    return this.organizationService.createUser(request.user!, body);
+  }
+
   @Post('departments')
   async createDepartment(@Req() request: AuthenticatedRequest, @Body() body: CreateDepartmentDto) {
     return ok(await this.organizationService.createDepartment(request.user!, body), '部门创建成功');
@@ -39,6 +44,11 @@ export class OrganizationController {
 
   @Patch('users/:id/organization')
   async updateUserOrganization(@Req() request: AuthenticatedRequest, @Param('id') id: string, @Body() body: UpdateUserOrganizationDto) {
-    return ok(await this.organizationService.updateUserOrganization(request.user!, id, body), '员工组织关系更新成功');
+    return this.organizationService.updateUserOrganization(request.user!, id, body);
+  }
+
+  @Delete('users/:id')
+  async deactivateUser(@Req() request: AuthenticatedRequest, @Param('id') id: string) {
+    return this.organizationService.deactivateUser(request.user!, id);
   }
 }

@@ -32,6 +32,10 @@ model User {
   attendanceRecords        AttendanceRecord[]
   sentMails                InternalMail[]        @relation("MailSender")
   mailRecipients           MailRecipient[]
+  collaborationMeetings    CollaborationMeeting[] @relation("MeetingOrganizer")
+  collaborationTasks       CollaborationTask[]    @relation("TaskInitiator")
+  collaborationGroups      CollaborationGroup[]   @relation("GroupOwner")
+  collaborationMessages    CollaborationMessage[] @relation("MessageSender")
   departmentEntity         Department?           @relation("UserDepartment", fields: [departmentId], references: [id], onDelete: Restrict)
   manager                  User?                 @relation("UserManager", fields: [managerId], references: [id], onDelete: Restrict)
   directReports            User[]                @relation("UserManager")
@@ -232,4 +236,67 @@ model AuditLog {
   riskLevel    String
   detail       String
   time         String
+}
+
+model CollaborationMeeting {
+  id                 String @id
+  title              String
+  startTime          String
+  location           String
+  description        String
+  organizerId        String
+  organizerName      String
+  participantIdsJson String
+  status             String @default("scheduled")
+  organizer          User   @relation("MeetingOrganizer", fields: [organizerId], references: [id], onDelete: Restrict)
+
+  @@index([organizerId, startTime])
+}
+
+model CollaborationTask {
+  id           String @id
+  title        String
+  description  String
+  initiatorId  String
+  initiatorName String
+  assigneeId   String
+  assigneeName String
+  status       String @default("pending")
+  reply        String @default("")
+  replyTime    String @default("")
+  dueTime      String @default("")
+  createTime   String
+  initiator    User   @relation("TaskInitiator", fields: [initiatorId], references: [id], onDelete: Restrict)
+
+  @@index([initiatorId, status])
+  @@index([assigneeId, status])
+}
+
+model CollaborationGroup {
+  id            String @id
+  name          String
+  description   String
+  ownerId       String
+  ownerName     String
+  memberIdsJson String
+  createTime    String
+  owner         User   @relation("GroupOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+
+  @@index([ownerId])
+}
+
+model CollaborationMessage {
+  id         String @id
+  senderId   String
+  senderName String
+  recipientId String
+  title      String
+  content    String
+  type       String @default("message")
+  relatedId  String @default("")
+  createTime String
+  read       Boolean @default(false)
+  sender     User    @relation("MessageSender", fields: [senderId], references: [id], onDelete: Restrict)
+
+  @@index([recipientId, read, createTime])
 }

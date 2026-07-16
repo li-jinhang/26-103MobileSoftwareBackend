@@ -9,6 +9,10 @@ function toJson(value: unknown): string {
 
 async function main() {
   await prisma.session.deleteMany();
+  await prisma.collaborationMessage.deleteMany();
+  await prisma.collaborationTask.deleteMany();
+  await prisma.collaborationMeeting.deleteMany();
+  await prisma.collaborationGroup.deleteMany();
   await prisma.approvalRecord.deleteMany();
   await prisma.workflowInstance.deleteMany();
   await prisma.notification.deleteMany();
@@ -848,6 +852,76 @@ async function main() {
         time: '2026-07-11 16:35'
       }
     ]
+  });
+
+  await prisma.collaborationMeeting.create({
+    data: {
+      id: 'meeting1',
+      title: '产品版本评审',
+      startTime: '2026-07-17 10:00',
+      location: 'A-301 会议室',
+      description: '确认本周版本范围与联调安排。',
+      organizerId: 'u2',
+      organizerName: '李清越',
+      participantIdsJson: toJson(['u1', 'u5', 'u6', 'u7']),
+      status: 'scheduled'
+    }
+  });
+
+  await prisma.collaborationTask.createMany({
+    data: [
+      {
+        id: 'task1',
+        title: '补充报销材料',
+        description: '请补充电子发票和行程截图。',
+        initiatorId: 'u2',
+        initiatorName: '李清越',
+        assigneeId: 'u1',
+        assigneeName: '张晓宁',
+        status: 'pending',
+        dueTime: '2026-07-17 18:00',
+        createTime: '2026-07-16 09:30'
+      },
+      {
+        id: 'task2',
+        title: '确认接口联调时间',
+        description: '请回复可参与接口联调的时间段。',
+        initiatorId: 'u1',
+        initiatorName: '张晓宁',
+        assigneeId: 'u6',
+        assigneeName: '陈思远',
+        status: 'pending',
+        dueTime: '2026-07-16 17:00',
+        createTime: '2026-07-16 09:40'
+      }
+    ]
+  });
+
+  await prisma.collaborationGroup.create({
+    data: {
+      id: 'group1',
+      name: '移动端版本协作组',
+      description: '产品、前后端与测试共同推进版本交付。',
+      ownerId: 'u2',
+      ownerName: '李清越',
+      memberIdsJson: toJson(['u1', 'u5', 'u6', 'u7']),
+      createTime: '2026-07-15 14:00'
+    }
+  });
+
+  await prisma.collaborationMessage.create({
+    data: {
+      id: 'message1',
+      senderId: 'u2',
+      senderName: '李清越',
+      recipientId: 'u1',
+      title: '工作对接：补充报销材料',
+      content: '请补充电子发票和行程截图。',
+      type: 'task',
+      relatedId: 'task1',
+      createTime: '2026-07-16 09:30',
+      read: false
+    }
   });
 }
 

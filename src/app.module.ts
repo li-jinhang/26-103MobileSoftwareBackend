@@ -10,6 +10,7 @@ import { AttendanceModule } from './modules/attendance.module';
 import { MailModule } from './modules/mail.module';
 import { OcrModule } from './modules/ocr.module';
 import { OrganizationModule } from './modules/organization.module';
+import { CollaborationModule } from './modules/collaboration.module';
 
 @Module({
   imports: [
@@ -24,7 +25,8 @@ import { OrganizationModule } from './modules/organization.module';
     AttendanceModule,
     MailModule,
     OcrModule,
-    OrganizationModule
+    OrganizationModule,
+    CollaborationModule
   ],
   providers: [PrismaService]
 })

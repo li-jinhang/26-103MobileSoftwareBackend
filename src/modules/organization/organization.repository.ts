@@ -45,6 +45,25 @@ export class OrganizationRepository {
     });
   }
 
+  createUser(data: Prisma.UserCreateInput) {
+    return this.prisma.user.create({
+      data,
+      include: { departmentEntity: true, manager: true }
+    });
+  }
+
+  deactivateUser(id: string) {
+    return this.prisma.user.update({
+      where: { id },
+      data: { employmentStatus: 'inactive' },
+      include: { departmentEntity: true, manager: true }
+    });
+  }
+
+  revokeUserSessions(userId: string) {
+    return this.prisma.session.updateMany({ where: { userId, revokedAt: null }, data: { revokedAt: new Date() } });
+  }
+
   createAuditLog(data: Prisma.AuditLogCreateInput) {
     return this.prisma.auditLog.create({ data });
   }

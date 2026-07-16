@@ -10,6 +10,8 @@ export function toDirectoryItem(user: OrganizationUser) {
     jobTitle: user.jobTitle,
     managerId: user.managerId || '',
     managerName: user.manager?.name || '',
+    role: user.role,
+    roleLabel: user.roleLabel,
     employmentStatus: user.employmentStatus
   };
 }

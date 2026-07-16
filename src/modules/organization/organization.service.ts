@@ -1,9 +1,11 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
+import * as bcrypt from 'bcrypt';
 import { v4 as uuid } from 'uuid';
 import { AppException } from '../../common/app-exception';
 import { formatDateTime } from '../../common/helpers';
 import {
   CreateDepartmentDto,
+  CreateUserDto,
   OrganizationUsersQueryDto,
   UpdateDepartmentDto,
   UpdateUserOrganizationDto
@@ -121,7 +123,7 @@ export class OrganizationService {
   }
 
   async updateUserOrganization(actor: Actor, id: string, body: UpdateUserOrganizationDto) {
-    this.requireAdmin(actor);
+    await this.requireHrOrAdmin(actor);
     const current = await this.requireUser(id);
     if (Object.keys(body).length === 0) this.bad('至少提供一个组织字段');
     const departmentId = body.departmentId ?? current.departmentId;
@@ -136,9 +138,48 @@ export class OrganizationService {
       ...(body.departmentId !== undefined && department ? { departmentEntity: { connect: { id: department.id } }, department: department.name } : {}),
       ...(body.managerId !== undefined ? { manager: managerId ? { connect: { id: managerId } } : { disconnect: true } } : {}),
       ...(body.jobTitle !== undefined ? { jobTitle: body.jobTitle.trim() } : {}),
+      ...(body.role !== undefined ? { role: body.role, roleLabel: this.roleLabel(body.role) } : {}),
       ...(body.employmentStatus !== undefined ? { employmentStatus: body.employmentStatus } : {})
     });
     await this.writeAudit(actor, 'update_user_organization', id, { before: current, after: updated });
+    return toDirectoryItem(updated);
+  }
+
+  async createUser(actor: Actor, body: CreateUserDto) {
+    await this.requireHrOrAdmin(actor);
+    await this.validateActiveDepartment(body.departmentId);
+    if (body.managerId) await this.validateManager('', body.managerId);
+    const existing = await this.repository.findUsers({ where: { account: body.account.trim() }, select: { id: true } });
+    if (existing.length > 0) this.bad('账号已存在');
+    const department = await this.repository.findDepartment(body.departmentId);
+    const created = await this.repository.createUser({
+      id: uuid(),
+      name: body.name.trim(),
+      account: body.account.trim(),
+      passwordHash: await bcrypt.hash(body.password, 10),
+      department: department!.name,
+      departmentEntity: { connect: { id: body.departmentId } },
+      manager: body.managerId ? { connect: { id: body.managerId } } : undefined,
+      jobTitle: body.jobTitle.trim(),
+      employmentStatus: 'active',
+      role: body.role,
+      roleLabel: this.roleLabel(body.role),
+      permissionsJson: '[]',
+      favoriteKnowledgeIdsJson: '[]',
+      recentKnowledgeIdsJson: '[]',
+      todoCount: 0
+    });
+    await this.writeAudit(actor, 'create_user', created.id, created);
+    return toDirectoryItem(created);
+  }
+
+  async deactivateUser(actor: Actor, id: string) {
+    await this.requireHrOrAdmin(actor);
+    const current = await this.requireUser(id);
+    if (current.id === actor.id) this.bad('不能停用当前登录用户');
+    const updated = await this.repository.deactivateUser(id);
+    await this.repository.revokeUserSessions(id);
+    await this.writeAudit(actor, 'deactivate_user', id, { before: current, after: updated });
     return toDirectoryItem(updated);
   }
 
@@ -156,6 +197,17 @@ export class OrganizationService {
 
   private requireAdmin(actor: Actor) {
     if (actor.role !== 'systemAdmin') throw new AppException(1003, '仅系统管理员可维护组织关系', HttpStatus.FORBIDDEN);
+  }
+
+  private async requireHrOrAdmin(actor: Actor) {
+    if (actor.role === 'systemAdmin') return;
+    const current = await this.repository.findUser(actor.id);
+    if (current?.departmentId === 'd-hr') return;
+    throw new AppException(1003, '仅 HR 或系统管理员可维护员工', HttpStatus.FORBIDDEN);
+  }
+
+  private roleLabel(role: string) {
+    return ({ employee: '普通员工', approver: '审批人', systemAdmin: '系统管理员', knowledgeAdmin: '知识管理员' } as Record<string, string>)[role] || role;
   }
 
   private async validateActiveDepartment(id: string) {

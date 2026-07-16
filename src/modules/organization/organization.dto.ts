@@ -97,6 +97,38 @@ export class UpdateUserOrganizationDto {
   jobTitle?: string;
 
   @IsOptional()
+  @IsIn(['employee', 'approver', 'systemAdmin', 'knowledgeAdmin'])
+  role?: 'employee' | 'approver' | 'systemAdmin' | 'knowledgeAdmin';
+
+  @IsOptional()
   @IsIn(['active', 'inactive'])
   employmentStatus?: 'active' | 'inactive';
+}
+
+export class CreateUserDto {
+  @IsString()
+  name!: string;
+
+  @IsString()
+  account!: string;
+
+  @IsString()
+  departmentId!: string;
+
+  @IsOptional()
+  @Transform(({ value }) => value === '' ? null : value)
+  @IsString()
+  managerId?: string | null;
+
+  @IsOptional()
+  @IsString()
+  jobTitle = '';
+
+  @IsOptional()
+  @IsIn(['employee', 'approver', 'systemAdmin', 'knowledgeAdmin'])
+  role: 'employee' | 'approver' | 'systemAdmin' | 'knowledgeAdmin' = 'employee';
+
+  @IsOptional()
+  @IsString()
+  password = '123456';
 }
