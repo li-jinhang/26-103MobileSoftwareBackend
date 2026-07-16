@@ -212,6 +212,7 @@ dist/src/main.js
 - 审批人：`manager01 / 123456`
 - 系统管理员：`admin01 / 123456`
 - 知识管理员：`knowledge01 / 123456`
+- 其他常用账号：`ceo01 / 123456`、`hr01 / 123456`、`finance01 / 123456`、`sales01 / 123456`、`procurement01 / 123456`
 
 ## 说明
 
