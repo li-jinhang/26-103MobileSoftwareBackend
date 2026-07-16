@@ -94,6 +94,10 @@ class AuthService {
     const user = await this.prisma.user.findUnique({
       where: {
         id: userId
+      },
+      include: {
+        departmentEntity: true,
+        manager: true
       }
     });
 
@@ -115,6 +119,12 @@ class AuthService {
       name: user.name,
       account: user.account,
       department: user.department,
+      departmentId: user.departmentId || '',
+      departmentName: user.departmentEntity?.name || user.department,
+      managerId: user.managerId || '',
+      managerName: user.manager?.name || '',
+      jobTitle: user.jobTitle,
+      employmentStatus: user.employmentStatus,
       role: user.role,
       roleLabel: user.roleLabel,
       permissions: parseJsonArray(user.permissionsJson),

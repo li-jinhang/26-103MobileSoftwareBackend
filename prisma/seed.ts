@@ -18,12 +18,27 @@ async function main() {
   await prisma.knowledgeCorrection.deleteMany();
   await prisma.assistantHistory.deleteMany();
   await prisma.auditLog.deleteMany();
+  await prisma.user.updateMany({
+    data: {
+      departmentId: null,
+      managerId: null
+    }
+  });
+  await prisma.department.deleteMany();
   await prisma.workflowTemplate.deleteMany();
   await prisma.knowledgeArticle.deleteMany();
   await prisma.knowledgeCategory.deleteMany();
   await prisma.user.deleteMany();
 
   const passwordHash = await bcrypt.hash('123456', 10);
+
+  await prisma.department.createMany({
+    data: [
+      { id: 'd-rd', name: '产品研发部', parentId: null, leaderId: null, sortOrder: 1, status: 'active' },
+      { id: 'd-it', name: '信息化管理部', parentId: null, leaderId: null, sortOrder: 2, status: 'active' },
+      { id: 'd-knowledge', name: '知识运营组', parentId: null, leaderId: null, sortOrder: 3, status: 'active' }
+    ]
+  });
 
   await prisma.user.createMany({
     data: [
@@ -33,6 +48,10 @@ async function main() {
         account: 'employee01',
         passwordHash,
         department: '产品研发部',
+        departmentId: 'd-rd',
+        managerId: null,
+        jobTitle: '产品经理',
+        employmentStatus: 'active',
         role: 'employee',
         roleLabel: '普通员工',
         permissionsJson: toJson(['知识查询', '收藏知识', '发起流程', '查看我的流程']),
@@ -45,7 +64,11 @@ async function main() {
         name: '李清越',
         account: 'manager01',
         passwordHash,
-        department: '部门负责人',
+        department: '产品研发部',
+        departmentId: 'd-rd',
+        managerId: null,
+        jobTitle: '研发部负责人',
+        employmentStatus: 'active',
         role: 'approver',
         roleLabel: '审批人',
         permissionsJson: toJson(['知识查询', '发起流程', '处理待办', '查看关联制度']),
@@ -59,6 +82,10 @@ async function main() {
         account: 'admin01',
         passwordHash,
         department: '信息化管理部',
+        departmentId: 'd-it',
+        managerId: null,
+        jobTitle: '系统管理员',
+        employmentStatus: 'active',
         role: 'systemAdmin',
         roleLabel: '系统管理员',
         permissionsJson: toJson(['知识管理', '用户角色管理', '流程模板管理', '查看操作日志', '安全确认']),
@@ -72,6 +99,10 @@ async function main() {
         account: 'knowledge01',
         passwordHash,
         department: '知识运营组',
+        departmentId: 'd-knowledge',
+        managerId: null,
+        jobTitle: '知识运营专员',
+        employmentStatus: 'active',
         role: 'knowledgeAdmin',
         roleLabel: '知识管理员',
         permissionsJson: toJson(['知识管理', '知识分类维护', '知识发布下架', '查看审计摘要']),
@@ -354,6 +385,12 @@ async function main() {
       }
     ]
   });
+
+  await prisma.user.update({ where: { id: 'u1' }, data: { managerId: 'u2' } });
+
+  await prisma.department.update({ where: { id: 'd-rd' }, data: { leaderId: 'u2' } });
+  await prisma.department.update({ where: { id: 'd-it' }, data: { leaderId: 'u3' } });
+  await prisma.department.update({ where: { id: 'd-knowledge' }, data: { leaderId: 'u4' } });
 
   await prisma.internalMail.create({
     data: {

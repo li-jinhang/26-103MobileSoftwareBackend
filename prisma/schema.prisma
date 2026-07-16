@@ -13,6 +13,10 @@ model User {
   account                  String                @unique
   passwordHash             String
   department               String
+  departmentId             String?
+  managerId                String?
+  jobTitle                 String                @default("")
+  employmentStatus         String                @default("active")
   role                     String
   roleLabel                String
   permissionsJson          String
@@ -28,6 +32,29 @@ model User {
   attendanceRecords        AttendanceRecord[]
   sentMails                InternalMail[]        @relation("MailSender")
   mailRecipients           MailRecipient[]
+  departmentEntity         Department?           @relation("UserDepartment", fields: [departmentId], references: [id], onDelete: Restrict)
+  manager                  User?                 @relation("UserManager", fields: [managerId], references: [id], onDelete: Restrict)
+  directReports            User[]                @relation("UserManager")
+  ledDepartments            Department[]          @relation("DepartmentLeader")
+
+  @@index([departmentId])
+  @@index([managerId])
+}
+
+model Department {
+  id          String       @id
+  name        String
+  parentId    String?
+  leaderId    String?
+  sortOrder   Int          @default(0)
+  status      String       @default("active")
+  parent      Department?  @relation("DepartmentTree", fields: [parentId], references: [id], onDelete: Restrict)
+  children    Department[] @relation("DepartmentTree")
+  leader      User?        @relation("DepartmentLeader", fields: [leaderId], references: [id], onDelete: SetNull)
+  members     User[]       @relation("UserDepartment")
+
+  @@index([parentId, sortOrder])
+  @@index([status])
 }
 
 model Session {

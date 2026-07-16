@@ -9,6 +9,7 @@ import { AssistantModule } from './modules/assistant.module';
 import { AttendanceModule } from './modules/attendance.module';
 import { MailModule } from './modules/mail.module';
 import { OcrModule } from './modules/ocr.module';
+import { OrganizationModule } from './modules/organization.module';
 
 @Module({
   imports: [
@@ -22,7 +23,8 @@ import { OcrModule } from './modules/ocr.module';
     AssistantModule,
     AttendanceModule,
     MailModule,
-    OcrModule
+    OcrModule,
+    OrganizationModule
   ],
   providers: [PrismaService]
 })
