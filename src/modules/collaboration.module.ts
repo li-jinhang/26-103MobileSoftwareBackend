@@ -88,6 +88,12 @@ class CreateGroupDto {
   memberIds: string[] = [];
 }
 
+class AddGroupMemberDto {
+  @IsString()
+  @IsNotEmpty()
+  memberId!: string;
+}
+
 @Injectable()
 class CollaborationService {
   constructor(private readonly prisma: PrismaService) {}
@@ -226,6 +232,20 @@ class CollaborationService {
     return this.groupResponse(item);
   }
 
+  async addGroupMember(user: NonNullable<AuthenticatedRequest['user']>, id: string, body: AddGroupMemberDto) {
+    const group = await this.prisma.collaborationGroup.findUnique({ where: { id } });
+    if (!group) this.notFound('工作组不存在');
+    if (group!.ownerId !== user.id) this.forbidden('仅组长可以管理成员');
+
+    const member = await this.requireActiveUser(body.memberId);
+    const memberIds = this.uniqueIds(parseJsonArray<string>(group!.memberIdsJson).concat([member.id]), user.id);
+    const updated = await this.prisma.collaborationGroup.update({
+      where: { id: group!.id },
+      data: { memberIdsJson: toJson(memberIds) }
+    });
+    return this.groupResponse(updated);
+  }
+
   async chains(userId: string) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
@@ -308,6 +328,7 @@ class CollaborationController {
   @Post('tasks/:id/reply') replyTask(@Req() request: AuthenticatedRequest, @Param('id') id: string, @Body() body: ReplyTaskDto) { return this.collaborationService.replyTask(request.user!, id, body); }
   @Get('groups') groups(@Req() request: AuthenticatedRequest) { return this.collaborationService.groups(request.user!.id); }
   @Post('groups') createGroup(@Req() request: AuthenticatedRequest, @Body() body: CreateGroupDto) { return this.collaborationService.createGroup(request.user!, body); }
+  @Post('groups/:id/members') addGroupMember(@Req() request: AuthenticatedRequest, @Param('id') id: string, @Body() body: AddGroupMemberDto) { return this.collaborationService.addGroupMember(request.user!, id, body); }
   @Get('chains') chains(@Req() request: AuthenticatedRequest) { return this.collaborationService.chains(request.user!.id); }
 }
 

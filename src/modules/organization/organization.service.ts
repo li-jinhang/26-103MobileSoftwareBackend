@@ -58,8 +58,8 @@ export class OrganizationService {
 
   async searchUsers(actor: Actor, query: OrganizationUsersQueryDto) {
     const user = await this.requireUser(actor.id);
-    const isAdminAll = actor.role === 'systemAdmin' && query.scope === 'all';
-    const departmentId = isAdminAll
+    const isAllScope = query.scope === 'all';
+    const departmentId = isAllScope
       ? query.departmentId
       : user.departmentId || '';
     const where: Record<string, unknown> = {
@@ -69,6 +69,7 @@ export class OrganizationService {
     if (query.keyword?.trim()) {
       const keyword = query.keyword.trim();
       where.OR = [
+        { id: { contains: keyword } },
         { name: { contains: keyword } },
         { account: { contains: keyword } },
         { jobTitle: { contains: keyword } }
